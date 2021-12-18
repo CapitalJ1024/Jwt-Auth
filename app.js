@@ -4,6 +4,7 @@ const mongoose = require("mongoose"); //initialising mongoose
 const bcrypt = require("bcryptjs")//initialising bcryptjs.
 const express = require("express");  //initialising express
 const app = express(); // declaring express
+var cookieParser = require('cookie-parser');
 
 dotenv.config({path: './config.env'});//declaring the path of .env file|
 //**************url to connect monog atlas
@@ -26,12 +27,12 @@ const PORT=process.env.PORT;
         required: true},
      password : {type : String,
         required: true},
-     tokens :[  //field for tokens
-         {
-         token : {type :String,
-                required: true}
-         }
-     ]   
+    //  tokens :[  //field for tokens
+    //      {
+    //      token : {type :String,
+    //             required: true}
+    //      }
+    //  ]   
  });
 
  //******************hashing password
@@ -45,18 +46,18 @@ const PORT=process.env.PORT;
 
 //*******************creating json web token
 //                         |------we are not using fat arrow function because of 'this' keyword
-schema.methods.genauthToken = async function(){
-    try{
-        let tokenJ = jwt.sign({_id: this._id}, process.env.SECRET_KEY)//two fun should pass - 1. payload (unique data -- can be id),2. Secret key
+// schema.methods.genauthToken = async function(){
+//     try{
+//         let tokenJ = jwt.sign({_id: this._id}, process.env.SECRET_KEY)//two fun should pass - 1. payload (unique data -- can be id),2. Secret key
                                                         
 
-        this.tokens = this.tokens.concat({token : tokenJ})//adding token in then token field 
-        await this.save();//saving token
-        return tokenJ;                                        
-    }catch(err){
-        console.log(err);
-    }
-}
+//         this.tokens = this.tokens.concat({token : tokenJ})//adding token in then token field 
+//         await this.save();//saving token
+//         return tokenJ;                                        
+//     }catch(err){
+//         console.log(err);
+//     }
+// }
 
 
 
@@ -65,7 +66,7 @@ const user = new mongoose.model ("user", schema);
 
 // for parsing the input
 app.use(express.urlencoded({ extended: true }))
-
+app.use(cookieParser());
 //declaring route'/' 
 app.get("/", function(req,res){
     res.sendFile( __dirname + '/index.html')
@@ -116,18 +117,35 @@ app.post("/login", async function(req, res){
     
     if (signin){
     const match = await bcrypt.compare(password, signin.password);  //direct hashed pass match ni ker skte , isliye filled pass, saved hashed pass ko compare krne ke liye iska use kiya.
-    const token = await signin.genauthToken();//passing token
+    //const token = await signin.genauthToken();//passing token
     //console.log(token);
+    
     if(!match){        
         res.status(400).json({error :"invalid credetials.pass"})
     }
     else{
-    res.json({message :"Login successful"})
-    console.log("Process Completed")
+        let tokenJ = jwt.sign({_id: this._id}, process.env.SECRET_KEY)
+    res.cookie("My_cookie", tokenJ).redirect("/page");
+    // console.log(tokenJ)
     }}else{
         res.status(400).json({error :"invalid credetials"})
     }
 }catch(err){console.log(err);}
+})
+app.get("/page", function(req, res){
+    res.sendFile(__dirname + '/page.html')
+})
+app.get("/personal", function(req, res){
+    
+    const token = req.cookies.My_cookie
+    jwt.verify(token , process.env.SECRET_KEY);
+    //   console.log(token.cookie);
+    res.sendFile(__dirname + '/personal.html')
+})
+app.get("/logout", function(req, res){
+    res.clearCookie("My_cookie")
+
+    res.redirect("/");
 })
 
 // creating server 
